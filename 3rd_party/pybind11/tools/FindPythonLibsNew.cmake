@@ -7,7 +7,6 @@
 #  PYTHON_PREFIX              - path to the Python installation
 #  PYTHON_LIBRARIES           - path to the python library
 #  PYTHON_EXECUTABLE          - path to the python executable
-#  PYTHON_RUNTIME_DLL_NAME    - (Windows only) the expected name of the Python runtime DLL (e.g., python310.dll)
 #  PYTHON_RUNTIME_DLL         - (Windows only) path to the Python runtime DLL (e.g., python310.dll)
 #  PYTHON_INCLUDE_DIRS        - path to where Python.h is found
 #  PYTHON_MODULE_EXTENSION    - lib extension, e.g. '.so' or '.pyd'
@@ -314,23 +313,22 @@ endif()
 
 # Liangliang: Windows also requires the Python runtime DLL (e.g., python310.dll)
 if (WIN32)
-  # Construct the expected DLL name based on the Python version
-  set(PYTHON_RUNTIME_DLL_NAME "python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}.dll")
-  # Search for the DLL in the Python installation directory
+  # Use a wildcard to catch 'python314.dll', 'python314t.dll', etc.
   find_file(PYTHON_RUNTIME_DLL
-          NAMES ${PYTHON_RUNTIME_DLL_NAME}
-          PATHS "${PYTHON_PREFIX}" "${PYTHON_PREFIX}/DLLs"
+          NAMES
+              "python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}.dll"
+              "python3${PYTHON_VERSION_MINOR}.dll"
+              "python3${PYTHON_VERSION_MINOR}t.dll"
+              "python3.dll"
+          PATHS
+              "${PYTHON_PREFIX}" "${PYTHON_PREFIX}/DLLs"
           NO_DEFAULT_PATH
-          )
+  )
   if (NOT PYTHON_RUNTIME_DLL)
-    message(WARNING "Python runtime DLL (${PYTHON_RUNTIME_DLL_NAME}) not found in ${PYTHON_PREFIX} or ${PYTHON_PREFIX}/DLLs")
+    message(WARNING "Python runtime DLL not found in ${PYTHON_PREFIX} or ${PYTHON_PREFIX}/DLLs")
   else ()
     message(STATUS "Found Python runtime DLL: ${PYTHON_RUNTIME_DLL}")
   endif ()
-
-  # Expose PYTHON_RUNTIME_DLL_NAME to the parent scope or cache
-  set(PYTHON_RUNTIME_DLL_NAME "${PYTHON_RUNTIME_DLL_NAME}" CACHE STRING "Name of the Python runtime DLL (e.g., python310.dll)")
-  mark_as_advanced(PYTHON_RUNTIME_DLL_NAME)
 endif ()
 
 message(STATUS "Found Python include directories: ${PYTHON_INCLUDE_DIRS}")
