@@ -247,30 +247,18 @@ string(REGEX REPLACE "\\\\" "/" PYTHON_SITE_PACKAGES "${PYTHON_SITE_PACKAGES}")
 if(DEFINED PYTHON_LIBRARY)
   # Don't write to PYTHON_LIBRARY if it's already set
 elseif(CMAKE_HOST_WIN32)
-  set(PYTHON_LIBRARY "${PYTHON_PREFIX}/libs/python${PYTHON_LIBRARY_SUFFIX}.lib")
+  # Try the specific version first (e.g., python314.lib)
+  set(PYTHON_LIBRARY "${PYTHON_PREFIX}/libs/python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}.lib")
 
-  # when run in a venv, PYTHON_PREFIX points to it. But the libraries remain in the
-  # original python installation. They may be found relative to PYTHON_INCLUDE_DIR.
+  # If that doesn't exist, try the generic python3.lib (often used in Conda/Mingw)
   if(NOT EXISTS "${PYTHON_LIBRARY}")
-    get_filename_component(_PYTHON_ROOT ${PYTHON_INCLUDE_DIR} DIRECTORY)
-    set(PYTHON_LIBRARY "${_PYTHON_ROOT}/libs/python${PYTHON_LIBRARY_SUFFIX}.lib")
+    set(PYTHON_LIBRARY "${PYTHON_PREFIX}/libs/python${PYTHON_VERSION_MAJOR}.lib")
   endif()
 
-  # if we are in MSYS & MINGW, and we didn't find windows python lib, look for system python lib
-  if(DEFINED ENV{MSYSTEM}
-     AND MINGW
-     AND NOT EXISTS "${PYTHON_LIBRARY}")
-    if(PYTHON_MULTIARCH)
-      set(_PYTHON_LIBS_SEARCH "${PYTHON_LIBDIR}/${PYTHON_MULTIARCH}" "${PYTHON_LIBDIR}")
-    else()
-      set(_PYTHON_LIBS_SEARCH "${PYTHON_LIBDIR}")
-    endif()
-    unset(PYTHON_LIBRARY)
-    find_library(
-      PYTHON_LIBRARY
-      NAMES "python${PYTHON_LIBRARY_SUFFIX}"
-      PATHS ${_PYTHON_LIBS_SEARCH}
-      NO_DEFAULT_PATH)
+  # Last resort: use a glob search to find ANY python3x.lib
+  if(NOT EXISTS "${PYTHON_LIBRARY}")
+    file(GLOB POSSIBLE_PYTHON_LIBS "${PYTHON_PREFIX}/libs/python3*.lib")
+    list(GET POSSIBLE_PYTHON_LIBS 0 PYTHON_LIBRARY)
   endif()
 
   # raise an error if the python libs are still not found.
