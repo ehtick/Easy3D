@@ -18,8 +18,6 @@ Adds the following functions::
 
 #]======================================================]
 
-include_guard(GLOBAL)
-
 # If we are in subdirectory mode, all IMPORTED targets must be GLOBAL. If we
 # are in CONFIG mode, they should be "normal" targets instead.
 # In CMake 3.11+ you can promote a target to global after you create it,
@@ -28,8 +26,13 @@ get_property(
   is_config
   TARGET pybind11::headers
   PROPERTY IMPORTED)
+
 if(NOT is_config)
+  include_guard(GLOBAL)
   set(optional_global GLOBAL)
+else()
+  include_guard(DIRECTORY)
+  set(optional_global "")
 endif()
 
 # If not run in Python mode, we still would like this to at least
@@ -38,7 +41,18 @@ set(pybind11_INCLUDE_DIRS
     "${pybind11_INCLUDE_DIR}"
     CACHE INTERNAL "Include directory for pybind11 (Python not requested)")
 
-if(CMAKE_CROSSCOMPILING AND PYBIND11_USE_CROSSCOMPILING)
+# CMP0190 prohibits calling FindPython with both Interpreter and Development components
+# when cross-compiling, unless the CMAKE_CROSSCOMPILING_EMULATOR variable is defined.
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.1")
+  cmake_policy(GET CMP0190 _pybind11_cmp0190)
+  if(_pybind11_cmp0190 STREQUAL "NEW")
+    set(PYBIND11_USE_CROSSCOMPILING "ON")
+  endif()
+endif()
+
+if(CMAKE_CROSSCOMPILING
+   AND PYBIND11_USE_CROSSCOMPILING
+   AND NOT DEFINED CMAKE_CROSSCOMPILING_EMULATOR)
   set(_PYBIND11_CROSSCOMPILING
       ON
       CACHE INTERNAL "")
@@ -110,12 +124,9 @@ if(MSVC) # That's also clang-cl
   # /bigobj is needed for bigger binding projects due to the limit to 64k
   # addressable sections
   set_property(
-          TARGET pybind11::windows_extras
-          APPEND
-          PROPERTY INTERFACE_COMPILE_OPTIONS
-          $<$<COMPILE_LANGUAGE:CXX>:/bigobj>
-          $<$<COMPILE_LANGUAGE:CXX>:/external:W0>
-  )
+    TARGET pybind11::windows_extras
+    APPEND
+    PROPERTY INTERFACE_COMPILE_OPTIONS $<$<COMPILE_LANGUAGE:CXX>:/bigobj>)
 
   # /MP enables multithreaded builds (relevant when there are many files) for MSVC
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC") # no Clang no Intel
@@ -187,15 +198,38 @@ if(PYBIND11_NOPYTHON)
   # We won't use new FindPython if PYBIND11_FINDPYTHON is defined and falselike
   # Otherwise, we use if FindPythonLibs is missing or if FindPython was already used
 elseif(
-  (NOT DEFINED PYBIND11_FINDPYTHON OR PYBIND11_FINDPYTHON)
+  (NOT DEFINED PYBIND11_FINDPYTHON
+   OR PYBIND11_FINDPYTHON STREQUAL "COMPAT"
+   OR PYBIND11_FINDPYTHON)
   AND (_pybind11_missing_old_python STREQUAL "NEW"
+       OR PYBIND11_FINDPYTHON STREQUAL "COMPAT"
        OR PYBIND11_FINDPYTHON
        OR Python_FOUND
        OR Python3_FOUND
       ))
 
   # New mode
-  include("${CMAKE_CURRENT_LIST_DIR}/pybind11NewTools.cmake")
+  if(Python_FOUND OR Python3_FOUND)
+    include("${CMAKE_CURRENT_LIST_DIR}/pybind11NewTools.cmake")
+  else()
+    include("${CMAKE_CURRENT_LIST_DIR}/pybind11NewTools.cmake")
+
+    if(PYBIND11_FINDPYTHON STREQUAL "COMPAT")
+      message(
+        "Using compatibility mode for Python, set PYBIND11_FINDPYTHON to NEW/OLD to silence this message"
+      )
+      set(PYTHON_EXECUTABLE "${Python_EXECUTABLE}")
+      set(PYTHON_INCLUDE_DIR "${Python_INCLUDE_DIR}")
+      set(Python_INCLUDE_DIRS "${Python_INCLUDE_DIRS}")
+      set(PYTHON_LIBRARY "${Python_LIBRARY}")
+      set(PYTHON_LIBRARIES "${Python_LIBRARIES}")
+      set(PYTHON_VERSION "${Python_VERSION}")
+      set(PYTHON_VERSION_STRING "${Python_VERSION_STRING}")
+      set(PYTHON_VERSION_MAJOR "${Python_VERSION_MAJOR}")
+      set(PYTHON_VERSION_MINOR "${Python_VERSION_MINOR}")
+      set(PYTHON_VERSION_PATCH "${Python_VERSION_PATCH}")
+    endif()
+  endif()
 
 else()
 
@@ -340,6 +374,11 @@ function(_pybind11_generate_lto target prefer_thin_lto)
         PYBIND11_LTO_CXX_FLAGS PYBIND11_LTO_LINKER_FLAGS)
     endif()
     if(NOT HAS_FLTO_THIN)
+      _pybind11_return_if_cxx_and_linker_flags_work(
+        HAS_FLTO_AUTO "-flto=auto${cxx_append}" "-flto=auto${linker_append}"
+        PYBIND11_LTO_CXX_FLAGS PYBIND11_LTO_LINKER_FLAGS)
+    endif()
+    if(NOT HAS_FLTO_AUTO)
       _pybind11_return_if_cxx_and_linker_flags_work(
         HAS_FLTO "-flto${cxx_append}" "-flto${linker_append}" PYBIND11_LTO_CXX_FLAGS
         PYBIND11_LTO_LINKER_FLAGS)
