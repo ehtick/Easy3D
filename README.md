@@ -222,7 +222,7 @@ found in the accompanying 'License' file.
 
 ### Acknowledgments
 The implementation of Easy3D greatly benefited from and was inspired by existing great open-source libraries, such as
-[PMP](http://www.pmp-library.org/), [libQGLViewer](http://libqglviewer.com/), [Surface mesh](https://opensource.cit-ec.de/projects/surface_mesh),
+[PMP](http://www.pmp-library.org/), [libQGLViewer](https://github.com/GillesDebunne/libQGLViewer), [Surface mesh](https://opensource.cit-ec.de/projects/surface_mesh),
 and [Graphite](http://graphite.gforge.inria.fr/). In particular, the implementation of several surface mesh 
 algorithms was taken (with modifications) from PMP, i.e., simplification, subdivision, smoothing, 
 parameterization, remeshing, hole filling, geodesic distances, fairing, curvatures, and triangulation. 
